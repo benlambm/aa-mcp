@@ -25,14 +25,14 @@ logging.basicConfig(
     format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
     stream=sys.stderr,
 )
-logger = logging.getLogger("aa-mcp")
+logger = logging.getLogger("aa_mcp")
 
 mcp = FastMCP(
     "Artificial Analysis",
     instructions=(
         "MCP server wrapping the Artificial Analysis API. "
         "Use aa_list_llms to browse LLM models, aa_get_model for details, "
-        "aa_compare_models to compare, aa_recent_model_updates for change tracking, "
+        "aa_compare_models to compare, aa_list_recent_updates for change tracking, "
         "aa_list_media_models for multimodal rankings, and aa_healthcheck to verify connectivity."
     ),
 )
@@ -48,7 +48,7 @@ def _err_response(tool: str, e: Exception) -> str:
     if isinstance(e, AAAuthError):
         return json.dumps(
             {
-                "error": "authentication_failed",
+                "error": "auth_failed",
                 "message": str(e),
                 "hint": "Set ARTIFICIAL_ANALYSIS_API_KEY env var. "
                 "Get a key at https://artificialanalysis.ai/account",
@@ -80,7 +80,7 @@ def _err_response(tool: str, e: Exception) -> str:
 
 
 def _model_summary(m: dict[str, Any]) -> dict[str, Any]:
-    """Extract a concise summary from an LLM model record."""
+    """Extract a concise summary from an LLM model record using official AA field names."""
     evals = m.get("evaluations", {})
     pricing = m.get("pricing", {})
     creator = m.get("model_creator", {})
@@ -88,16 +88,25 @@ def _model_summary(m: dict[str, Any]) -> dict[str, Any]:
         "id": m.get("id"),
         "name": m.get("name"),
         "slug": m.get("slug"),
-        "creator": creator.get("name") if isinstance(creator, dict) else creator,
-        "creator_id": creator.get("id") if isinstance(creator, dict) else None,
-        "intelligence_index": evals.get("artificial_analysis_intelligence_index"),
-        "coding_index": evals.get("artificial_analysis_coding_index"),
-        "math_index": evals.get("artificial_analysis_math_index"),
-        "price_blended_3to1": pricing.get("price_1m_blended_3_to_1"),
-        "price_input": pricing.get("price_1m_input_tokens"),
-        "price_output": pricing.get("price_1m_output_tokens"),
-        "output_tps": m.get("median_output_tokens_per_second"),
-        "ttft_seconds": m.get("median_time_to_first_token_seconds"),
+        "model_creator": creator.get("name") if isinstance(creator, dict) else creator,
+        "model_creator_id": creator.get("id") if isinstance(creator, dict) else None,
+        "artificial_analysis_intelligence_index": evals.get(
+            "artificial_analysis_intelligence_index"
+        ),
+        "artificial_analysis_coding_index": evals.get(
+            "artificial_analysis_coding_index"
+        ),
+        "artificial_analysis_math_index": evals.get(
+            "artificial_analysis_math_index"
+        ),
+        "price_1m_blended_3_to_1": pricing.get("price_1m_blended_3_to_1"),
+        "price_1m_input_tokens": pricing.get("price_1m_input_tokens"),
+        "price_1m_output_tokens": pricing.get("price_1m_output_tokens"),
+        "median_output_tokens_per_second": m.get("median_output_tokens_per_second"),
+        "median_time_to_first_token_seconds": m.get(
+            "median_time_to_first_token_seconds"
+        ),
+        "release_date": m.get("release_date"),
     }
 
 
@@ -351,33 +360,59 @@ def aa_compare_models(identifiers: list[str]) -> str:
                     "id": m.get("id"),
                     "name": m.get("name"),
                     "slug": m.get("slug"),
-                    "creator": (
+                    "model_creator": (
                         creator.get("name") if isinstance(creator, dict) else None
                     ),
-                    "intelligence_index": evals.get(
+                    "artificial_analysis_intelligence_index": evals.get(
                         "artificial_analysis_intelligence_index"
                     ),
-                    "coding_index": evals.get("artificial_analysis_coding_index"),
-                    "math_index": evals.get("artificial_analysis_math_index"),
+                    "artificial_analysis_coding_index": evals.get(
+                        "artificial_analysis_coding_index"
+                    ),
+                    "artificial_analysis_math_index": evals.get(
+                        "artificial_analysis_math_index"
+                    ),
                     "mmlu_pro": evals.get("mmlu_pro"),
                     "gpqa": evals.get("gpqa"),
-                    "price_blended_3to1": pricing.get("price_1m_blended_3_to_1"),
-                    "price_input": pricing.get("price_1m_input_tokens"),
-                    "price_output": pricing.get("price_1m_output_tokens"),
-                    "output_tps": m.get("median_output_tokens_per_second"),
-                    "ttft_seconds": m.get("median_time_to_first_token_seconds"),
+                    "price_1m_blended_3_to_1": pricing.get("price_1m_blended_3_to_1"),
+                    "price_1m_input_tokens": pricing.get("price_1m_input_tokens"),
+                    "price_1m_output_tokens": pricing.get("price_1m_output_tokens"),
+                    "median_output_tokens_per_second": m.get(
+                        "median_output_tokens_per_second"
+                    ),
+                    "median_time_to_first_token_seconds": m.get(
+                        "median_time_to_first_token_seconds"
+                    ),
                 }
             )
 
         # Compute rankings
         rankings: dict[str, list[str]] = {}
         for metric, key_fn in [
-            ("intelligence", lambda c: c.get("intelligence_index") or 0),
-            ("coding", lambda c: c.get("coding_index") or 0),
-            ("math", lambda c: c.get("math_index") or 0),
-            ("speed_output_tps", lambda c: c.get("output_tps") or 0),
-            ("price_blended", lambda c: -(c.get("price_blended_3to1") or 999999)),
-            ("ttft", lambda c: -(c.get("ttft_seconds") or 99999)),
+            (
+                "intelligence",
+                lambda c: c.get("artificial_analysis_intelligence_index") or 0,
+            ),
+            (
+                "coding",
+                lambda c: c.get("artificial_analysis_coding_index") or 0,
+            ),
+            (
+                "math",
+                lambda c: c.get("artificial_analysis_math_index") or 0,
+            ),
+            (
+                "speed",
+                lambda c: c.get("median_output_tokens_per_second") or 0,
+            ),
+            (
+                "price",
+                lambda c: -(c.get("price_1m_blended_3_to_1") or 999999),
+            ),
+            (
+                "ttft",
+                lambda c: -(c.get("median_time_to_first_token_seconds") or 99999),
+            ),
         ]:
             ranked = sorted(comparison, key=key_fn, reverse=True)
             rankings[metric] = [c["name"] for c in ranked]
@@ -394,11 +429,11 @@ def aa_compare_models(identifiers: list[str]) -> str:
         return _err_response("aa_compare_models", e)
 
 
-# ── Tool 4: aa_recent_model_updates ────────────────────────────────
+# ── Tool 4: aa_list_recent_updates ──────────────────────────────────
 
 
 @mcp.tool()
-def aa_recent_model_updates(save_new_snapshot: bool = True) -> str:
+def aa_list_recent_updates(save_new_snapshot: bool = True) -> str:
     """Detect recent LLM model changes by comparing current data to the last local snapshot.
 
     Identifies new models, removed models, and field-level changes (pricing, speed,
@@ -468,7 +503,7 @@ def aa_recent_model_updates(save_new_snapshot: bool = True) -> str:
             indent=2,
         )
     except Exception as e:
-        return _err_response("aa_recent_model_updates", e)
+        return _err_response("aa_list_recent_updates", e)
 
 
 # ── Tool 5: aa_list_media_models ───────────────────────────────────

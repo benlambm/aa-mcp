@@ -65,7 +65,7 @@ Side-by-side comparison of 2+ models.
 - Returns rankings across all metrics
 - Input: list of identifiers (ids, slugs, or names)
 
-### `aa_recent_model_updates`
+### `aa_list_recent_updates`
 Detect changes since the last local snapshot.
 
 - **New models**: present in current data but not in snapshot
@@ -89,7 +89,7 @@ Verify API key and upstream connectivity.
 
 ## Snapshot / Update Tracking
 
-The `aa_recent_model_updates` tool uses a local JSON snapshot mechanism:
+The `aa_list_recent_updates` tool uses a local JSON snapshot mechanism:
 
 1. **First call**: Fetches all LLM models, saves a normalized snapshot to disk, reports "baseline created"
 2. **Subsequent calls**: Fetches fresh data, diffs against the latest snapshot, reports changes
@@ -130,7 +130,7 @@ aa_get_model("claude-3-5-sonnet")
 aa_compare_models(["gpt-4o", "claude-3-5-sonnet", "gemini-1.5-pro"])
 
 # Check for recent model changes
-aa_recent_model_updates()
+aa_list_recent_updates()
 
 # Top 5 text-to-image models
 aa_list_media_models(modality="text-to-image", top_n=5)
