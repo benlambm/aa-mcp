@@ -186,4 +186,17 @@ uv run twine check dist/*
 
 ## Attribution
 
-Data from [Artificial Analysis](https://artificialanalysis.ai/). Attribution required per their terms.
+<p>
+  <img src="https://raw.githubusercontent.com/Leev1s/aa-mcp/main/assets/artificial-analysis-logo.svg" alt="Artificial Analysis" width="260">
+</p>
+
+This project uses data and benchmark resources from
+[Artificial Analysis](https://artificialanalysis.ai/).
+
+Attribution is required for all use of the Artificial Analysis free API. If you
+publish outputs, dashboards, reports, or derivative analysis using data returned
+by this MCP server, include attribution to
+[artificialanalysis.ai](https://artificialanalysis.ai/).
+
+CritPt benchmark evaluation data should also include attribution to the
+[CritPt project](https://critpt.com/).
