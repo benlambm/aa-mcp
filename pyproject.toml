@@ -1,6 +1,6 @@
 [project]
 name = "aa-mcp"
-version = "0.1.0"
+version = "0.1.1"
 description = "MCP server wrapping the Artificial Analysis API for LLM and multimodal model data queries"
 readme = "README.md"
 license = "MIT"
@@ -34,7 +34,6 @@ dev = [
 ]
 
 [project.scripts]
-aa-mcp-server = "aa_mcp.server:main"
 aa-mcp = "aa_mcp.server:main"
 
 [project.urls]

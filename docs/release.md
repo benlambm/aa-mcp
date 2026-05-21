@@ -21,13 +21,6 @@ uv build
 uv run twine check dist/*
 ```
 
-For a local MCP smoke test:
-
-```bash
-export ARTIFICIAL_ANALYSIS_API_KEY="aa_your_key_here"
-uv run aa-mcp-server
-```
-
 ## Publish
 
 Publish only after the verification commands pass and the PyPI credentials are configured locally.

@@ -3,29 +3,9 @@
 `aa-mcp` installs an MCP stdio command and reads its Artificial
 Analysis API key from the environment. Do not put API keys in source control.
 
-## Published PyPI Package
+## Configuration
 
-Use this configuration after the package is available on PyPI:
-
-```json
-{
-  "mcp": {
-    "servers": {
-      "artificial-analysis": {
-        "command": "uvx",
-        "args": ["--from", "aa-mcp", "aa-mcp-server"],
-        "env": {
-          "ARTIFICIAL_ANALYSIS_API_KEY": "aa_your_key_here"
-        }
-      }
-    }
-  }
-}
-```
-
-## Local Checkout
-
-Use this configuration while developing or testing an unpublished checkout:
+Use the published PyPI package through `uvx`:
 
 ```json
 {
@@ -33,7 +13,7 @@ Use this configuration while developing or testing an unpublished checkout:
     "servers": {
       "artificial-analysis": {
         "command": "uvx",
-        "args": ["--from", "/absolute/path/to/aa-mcp", "aa-mcp-server"],
+        "args": ["aa-mcp"],
         "env": {
           "ARTIFICIAL_ANALYSIS_API_KEY": "aa_your_key_here"
         }

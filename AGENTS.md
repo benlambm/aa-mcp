@@ -16,7 +16,7 @@ Project metadata and packaging configuration are in `pyproject.toml`; dependency
 Use `uv` for all Python workflows.
 
 - `uv sync`: install locked dependencies for local development.
-- `uv run aa-mcp-server`: run the MCP server from source using stdio transport.
+- `uvx aa-mcp`: run the published MCP server using stdio transport.
 - `uv build`: build source and wheel distributions.
 - `uv run pytest`: run the test suite once tests are added.
 
@@ -24,7 +24,7 @@ For manual server checks, set `ARTIFICIAL_ANALYSIS_API_KEY` before launching:
 
 ```bash
 export ARTIFICIAL_ANALYSIS_API_KEY="aa_your_key_here"
-uv run aa-mcp-server
+uvx aa-mcp
 ```
 
 ## Coding Style & Naming Conventions

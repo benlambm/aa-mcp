@@ -3,8 +3,7 @@
 MCP server wrapping the [Artificial Analysis](https://artificialanalysis.ai/) public API.
 Enables AI agents to query LLM and multimodal model benchmarks, pricing, speed data, and track model updates via structured diffs.
 
-The PyPI package is `aa-mcp`; it installs both `aa-mcp` and `aa-mcp-server`
-console commands.
+The PyPI package is `aa-mcp`; it installs the `aa-mcp` console command.
 
 ## Requirements
 
@@ -14,37 +13,11 @@ console commands.
 
 ## Installation & Running
 
-### Run from PyPI with uvx
-
-After the package is published:
+Use `uvx` as the standard runtime path:
 
 ```bash
 export ARTIFICIAL_ANALYSIS_API_KEY="aa_your_key_here"
 uvx aa-mcp
-```
-
-### Run directly from a local checkout with uvx
-
-```bash
-# Set your API key
-export ARTIFICIAL_ANALYSIS_API_KEY="aa_your_key_here"
-
-# Run the MCP server from a local path (stdio transport)
-uvx --from /path/to/aa-mcp aa-mcp-server
-```
-
-### Run from source (development)
-
-```bash
-cd aa-mcp
-uv sync
-uv run aa-mcp-server
-```
-
-### Run with uvx from a local directory
-
-```bash
-uvx --from ./aa-mcp aa-mcp-server
 ```
 
 ## Environment Variables
@@ -142,7 +115,7 @@ Add to your `opencode.json`:
     "servers": {
       "artificial-analysis": {
         "command": "uvx",
-        "args": ["--from", "/path/to/aa-mcp", "aa-mcp-server"],
+        "args": ["aa-mcp"],
         "env": {
           "ARTIFICIAL_ANALYSIS_API_KEY": "aa_your_key_here"
         }
@@ -152,7 +125,7 @@ Add to your `opencode.json`:
 }
 ```
 
-For PyPI and local-checkout MCP client examples, see
+For MCP client examples, see
 [`docs/mcp-client-config.md`](docs/mcp-client-config.md).
 
 ## Example Usage (via MCP client)
@@ -191,6 +164,8 @@ aa_healthcheck()
 ```
 
 ## Development Checks
+
+For development, run the release checks from a source checkout:
 
 ```bash
 uv sync --dev
