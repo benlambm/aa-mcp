@@ -10,7 +10,14 @@ from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from .client import AAAuthError, AAError, AARateLimitError, AAServerError, AAClient
+from .client import (
+    AAAuthError,
+    AAError,
+    AARateLimitError,
+    AARequestError,
+    AAServerError,
+    AAClient,
+)
 from .snapshot import (
     diff_snapshots,
     format_diff_readable,
@@ -33,7 +40,8 @@ mcp = FastMCP(
         "MCP server wrapping the Artificial Analysis API. "
         "Use aa_list_llms to browse LLM models, aa_get_model for details, "
         "aa_compare_models to compare, aa_list_recent_updates for change tracking, "
-        "aa_list_media_models for multimodal rankings, and aa_healthcheck to verify connectivity."
+        "aa_list_media_models for multimodal rankings, aa_evaluate_critpt for CritPt "
+        "batch evaluation, and aa_healthcheck to verify connectivity."
     ),
 )
 
@@ -67,6 +75,14 @@ def _err_response(tool: str, e: Exception) -> str:
         return json.dumps(
             {
                 "error": "server_error",
+                "message": str(e),
+                "status_code": e.status_code,
+            }
+        )
+    if isinstance(e, AARequestError):
+        return json.dumps(
+            {
+                "error": "request_failed",
                 "message": str(e),
                 "status_code": e.status_code,
             }
@@ -543,7 +559,64 @@ def aa_list_media_models(
         return _err_response("aa_list_media_models", e)
 
 
-# ── Tool 6: aa_healthcheck ─────────────────────────────────────────
+# ── Tool 6: aa_evaluate_critpt ─────────────────────────────────────
+
+
+@mcp.tool()
+def aa_evaluate_critpt(
+    submissions: list[dict[str, Any]],
+    batch_metadata: dict[str, Any] | None = None,
+) -> str:
+    """Submit a complete CritPt benchmark batch for official evaluation.
+
+    The upstream endpoint requires submissions for all public CritPt problems in
+    one request. Each submission should include problem_id, generated_code,
+    model, and generation_config. This tool can take substantial time because
+    the upstream grading service runs benchmark evaluation jobs.
+
+    Args:
+        submissions: Complete list of CritPt submission objects.
+        batch_metadata: Optional metadata for the batch.
+
+    Returns:
+        JSON response with accuracy, timeout rate, and judge/server error counts.
+    """
+    try:
+        if not submissions:
+            return json.dumps(
+                {
+                    "error": "invalid_input",
+                    "message": "Provide at least one CritPt submission object.",
+                    "hint": "The upstream API requires a complete public-problem batch.",
+                }
+            )
+
+        missing_required: list[dict[str, Any]] = []
+        required = {"problem_id", "generated_code", "model", "generation_config"}
+        for index, submission in enumerate(submissions):
+            missing = sorted(required - set(submission.keys()))
+            if missing:
+                missing_required.append({"index": index, "missing": missing})
+
+        if missing_required:
+            return json.dumps(
+                {
+                    "error": "invalid_input",
+                    "message": "Each CritPt submission must include all required fields.",
+                    "required_fields": sorted(required),
+                    "invalid_submissions": missing_required,
+                },
+                indent=2,
+            )
+
+        client = _get_client()
+        result = client.evaluate_critpt(submissions, batch_metadata)
+        return json.dumps(result, indent=2)
+    except Exception as e:
+        return _err_response("aa_evaluate_critpt", e)
+
+
+# ── Tool 7: aa_healthcheck ─────────────────────────────────────────
 
 
 @mcp.tool()

@@ -31,6 +31,10 @@ class AAServerError(AAError):
     """Upstream server error (5xx)."""
 
 
+class AARequestError(AAError):
+    """Invalid request or unsupported upstream response."""
+
+
 def _get_api_key() -> str:
     key = os.environ.get("ARTIFICIAL_ANALYSIS_API_KEY", "").strip()
     if not key:
@@ -49,6 +53,17 @@ def _headers(api_key: str) -> dict[str, str]:
 
 
 def _check_response(resp: httpx.Response) -> None:
+    def _response_message(default: str) -> str:
+        try:
+            body = resp.json()
+        except ValueError:
+            body = resp.text
+        if isinstance(body, dict):
+            detail = body.get("error") or body.get("message") or body
+        else:
+            detail = body.strip()[:500]
+        return f"{default}: {detail}" if detail else default
+
     if resp.status_code == 401:
         raise AAAuthError(
             "Invalid or missing API key. Check ARTIFICIAL_ANALYSIS_API_KEY.", 401
@@ -62,8 +77,15 @@ def _check_response(resp: httpx.Response) -> None:
         )
     if resp.status_code >= 500:
         raise AAServerError(
-            f"Artificial Analysis server error (HTTP {resp.status_code}). "
-            f"Try again later.",
+            _response_message(
+                f"Artificial Analysis server error (HTTP {resp.status_code}). "
+                "Try again later."
+            ),
+            resp.status_code,
+        )
+    if resp.status_code >= 400:
+        raise AARequestError(
+            _response_message(f"Artificial Analysis request failed (HTTP {resp.status_code})"),
             resp.status_code,
         )
     resp.raise_for_status()
@@ -80,6 +102,15 @@ class AAClient:
         url = f"{AA_BASE_URL}{path}"
         with httpx.Client(timeout=self.timeout) as client:
             resp = client.get(url, headers=_headers(self.api_key), params=params)
+        _check_response(resp)
+        return resp.json()
+
+    def _post(self, path: str, json_body: dict[str, Any]) -> dict[str, Any]:
+        url = f"{AA_BASE_URL}{path}"
+        headers = _headers(self.api_key)
+        headers["Content-Type"] = "application/json"
+        with httpx.Client(timeout=self.timeout) as client:
+            resp = client.post(url, headers=headers, json=json_body)
         _check_response(resp)
         return resp.json()
 
@@ -113,6 +144,20 @@ class AAClient:
             params["include_categories"] = "true"
         data = self._get(endpoint, params)
         return data.get("data", [])
+
+    # ── CritPt endpoint ─────────────────────────────────────────────
+
+    def evaluate_critpt(
+        self,
+        submissions: list[dict[str, Any]],
+        batch_metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Submit a complete CritPt batch for official evaluation."""
+        payload = {
+            "submissions": submissions,
+            "batch_metadata": batch_metadata or {},
+        }
+        return self._post("/critpt/evaluate", payload)
 
     # ── Healthcheck ─────────────────────────────────────────────────
 
