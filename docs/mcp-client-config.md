@@ -33,7 +33,7 @@ Use this configuration while developing or testing an unpublished checkout:
     "servers": {
       "artificial-analysis": {
         "command": "uvx",
-        "args": ["--from", "/absolute/path/to/aa-mcp-server", "aa-mcp-server"],
+        "args": ["--from", "/absolute/path/to/aa-mcp", "aa-mcp-server"],
         "env": {
           "ARTIFICIAL_ANALYSIS_API_KEY": "aa_your_key_here"
         }

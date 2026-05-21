@@ -30,13 +30,13 @@ uvx aa-mcp
 export ARTIFICIAL_ANALYSIS_API_KEY="aa_your_key_here"
 
 # Run the MCP server from a local path (stdio transport)
-uvx --from /path/to/aa-mcp-server aa-mcp-server
+uvx --from /path/to/aa-mcp aa-mcp-server
 ```
 
 ### Run from source (development)
 
 ```bash
-cd aa-mcp-server
+cd aa-mcp
 uv sync
 uv run aa-mcp-server
 ```
@@ -44,7 +44,7 @@ uv run aa-mcp-server
 ### Run with uvx from a local directory
 
 ```bash
-uvx --from ./aa-mcp-server aa-mcp-server
+uvx --from ./aa-mcp aa-mcp-server
 ```
 
 ## Environment Variables
@@ -142,7 +142,7 @@ Add to your `opencode.json`:
     "servers": {
       "artificial-analysis": {
         "command": "uvx",
-        "args": ["--from", "/path/to/aa-mcp-server", "aa-mcp-server"],
+        "args": ["--from", "/path/to/aa-mcp", "aa-mcp-server"],
         "env": {
           "ARTIFICIAL_ANALYSIS_API_KEY": "aa_your_key_here"
         }
