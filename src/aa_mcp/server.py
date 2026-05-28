@@ -12,6 +12,7 @@ from mcp.server.fastmcp import FastMCP
 
 from .client import (
     AAAuthError,
+    AAConnectionError,
     AAError,
     AARateLimitError,
     AARequestError,
@@ -53,6 +54,14 @@ def _get_client() -> AAClient:
 
 def _err_response(tool: str, e: Exception) -> str:
     """Format an error as agent-friendly JSON string."""
+    if isinstance(e, AAConnectionError):
+        payload: dict[str, Any] = {
+            "error": "connection_failed",
+            "message": str(e),
+        }
+        if e.status_code is not None:
+            payload["status_code"] = e.status_code
+        return json.dumps(payload)
     if isinstance(e, AAAuthError):
         return json.dumps(
             {
@@ -665,6 +674,14 @@ def aa_healthcheck() -> str:
             {
                 "ok": False,
                 "error": "rate_limited",
+                "message": str(e),
+            }
+        )
+    except AAConnectionError as e:
+        return json.dumps(
+            {
+                "ok": False,
+                "error": "connection_failed",
                 "message": str(e),
             }
         )

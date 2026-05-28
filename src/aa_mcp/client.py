@@ -8,7 +8,9 @@ from typing import Any
 import httpx
 
 AA_BASE_URL = "https://artificialanalysis.ai/api/v2"
-DEFAULT_TIMEOUT = 30.0
+DEFAULT_TIMEOUT_SECONDS = 8.0
+DEFAULT_MAX_RETRIES = 2
+TRANSIENT_GET_STATUS_CODES = {502, 503, 504}
 
 
 class AAError(Exception):
@@ -31,8 +33,32 @@ class AAServerError(AAError):
     """Upstream server error (5xx)."""
 
 
+class AAConnectionError(AAError):
+    """Transient network or upstream availability failure."""
+
+
 class AARequestError(AAError):
     """Invalid request or unsupported upstream response."""
+
+
+def _env_float(name: str, default: float) -> float:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    try:
+        return float(raw)
+    except ValueError:
+        return default
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        return default
 
 
 def _get_api_key() -> str:
@@ -94,23 +120,74 @@ def _check_response(resp: httpx.Response) -> None:
 class AAClient:
     """Synchronous client for the Artificial Analysis free API."""
 
-    def __init__(self, api_key: str | None = None, timeout: float = DEFAULT_TIMEOUT):
+    def __init__(
+        self,
+        api_key: str | None = None,
+        timeout: float | None = None,
+        max_retries: int | None = None,
+    ):
         self.api_key = api_key or _get_api_key()
-        self.timeout = timeout
+        self.timeout = (
+            timeout
+            if timeout is not None
+            else _env_float("AA_MCP_TIMEOUT_SECONDS", DEFAULT_TIMEOUT_SECONDS)
+        )
+        self.max_retries = (
+            max(0, max_retries)
+            if max_retries is not None
+            else _env_int("AA_MCP_MAX_RETRIES", DEFAULT_MAX_RETRIES)
+        )
 
     def _get(self, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
         url = f"{AA_BASE_URL}{path}"
-        with httpx.Client(timeout=self.timeout) as client:
-            resp = client.get(url, headers=_headers(self.api_key), params=params)
-        _check_response(resp)
-        return resp.json()
+        attempts = self.max_retries + 1
+        for attempt in range(attempts):
+            try:
+                with httpx.Client(timeout=self.timeout) as client:
+                    resp = client.get(url, headers=_headers(self.api_key), params=params)
+            except httpx.TimeoutException as exc:
+                if attempt < self.max_retries:
+                    continue
+                raise AAConnectionError(
+                    f"Artificial Analysis request timed out after {attempts} attempts."
+                ) from exc
+            except httpx.TransportError as exc:
+                if attempt < self.max_retries:
+                    continue
+                raise AAConnectionError(
+                    "Artificial Analysis connection failed after "
+                    f"{attempts} attempts: {exc}"
+                ) from exc
+
+            if resp.status_code in TRANSIENT_GET_STATUS_CODES:
+                if attempt < self.max_retries:
+                    continue
+                raise AAConnectionError(
+                    "Artificial Analysis temporarily unavailable "
+                    f"(HTTP {resp.status_code}) after {attempts} attempts.",
+                    resp.status_code,
+                )
+
+            _check_response(resp)
+            return resp.json()
+
+        raise AAConnectionError("Artificial Analysis request failed unexpectedly.")
 
     def _post(self, path: str, json_body: dict[str, Any]) -> dict[str, Any]:
         url = f"{AA_BASE_URL}{path}"
         headers = _headers(self.api_key)
         headers["Content-Type"] = "application/json"
-        with httpx.Client(timeout=self.timeout) as client:
-            resp = client.post(url, headers=headers, json=json_body)
+        try:
+            with httpx.Client(timeout=self.timeout) as client:
+                resp = client.post(url, headers=headers, json=json_body)
+        except httpx.TimeoutException as exc:
+            raise AAConnectionError(
+                "Artificial Analysis request timed out. The request was not retried."
+            ) from exc
+        except httpx.TransportError as exc:
+            raise AAConnectionError(
+                f"Artificial Analysis connection failed: {exc}"
+            ) from exc
         _check_response(resp)
         return resp.json()
 
