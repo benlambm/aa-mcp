@@ -106,6 +106,34 @@ def test_get_retries_transient_http_status_once(monkeypatch) -> None:
     assert calls == 2
 
 
+def test_post_uses_longer_default_timeout_than_get(monkeypatch) -> None:
+    observed: list[float] = []
+
+    class RecordingHTTPClient:
+        def __init__(self, timeout: float) -> None:
+            observed.append(timeout)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        def post(self, url: str, headers: dict, json: dict):
+            return httpx.Response(
+                200,
+                json={"accuracy": 1.0},
+                request=httpx.Request("POST", url),
+            )
+
+    monkeypatch.setattr(httpx, "Client", RecordingHTTPClient)
+
+    client = AAClient(api_key="test-key", timeout=8, post_timeout=120)
+    client.evaluate_critpt([{"problem_id": "p"}])
+
+    assert observed == [120]
+
+
 def test_post_timeout_is_not_retried(monkeypatch) -> None:
     calls = 0
 

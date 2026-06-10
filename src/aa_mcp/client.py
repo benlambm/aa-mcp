@@ -9,6 +9,7 @@ import httpx
 
 AA_BASE_URL = "https://artificialanalysis.ai/api/v2"
 DEFAULT_TIMEOUT_SECONDS = 8.0
+DEFAULT_POST_TIMEOUT_SECONDS = 120.0
 DEFAULT_MAX_RETRIES = 2
 TRANSIENT_GET_STATUS_CODES = {502, 503, 504}
 
@@ -124,6 +125,7 @@ class AAClient:
         self,
         api_key: str | None = None,
         timeout: float | None = None,
+        post_timeout: float | None = None,
         max_retries: int | None = None,
     ):
         self.api_key = api_key or _get_api_key()
@@ -131,6 +133,11 @@ class AAClient:
             timeout
             if timeout is not None
             else _env_float("AA_MCP_TIMEOUT_SECONDS", DEFAULT_TIMEOUT_SECONDS)
+        )
+        self.post_timeout = (
+            post_timeout
+            if post_timeout is not None
+            else _env_float("AA_MCP_POST_TIMEOUT_SECONDS", DEFAULT_POST_TIMEOUT_SECONDS)
         )
         self.max_retries = (
             max(0, max_retries)
@@ -178,7 +185,7 @@ class AAClient:
         headers = _headers(self.api_key)
         headers["Content-Type"] = "application/json"
         try:
-            with httpx.Client(timeout=self.timeout) as client:
+            with httpx.Client(timeout=self.post_timeout) as client:
                 resp = client.post(url, headers=headers, json=json_body)
         except httpx.TimeoutException as exc:
             raise AAConnectionError(
