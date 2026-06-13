@@ -151,3 +151,27 @@ def test_aa_list_llms_preserves_success_shape(monkeypatch) -> None:
             "release_date": None,
         }
     ]
+
+
+def test_aa_list_recent_updates_preserves_snapshot_on_empty_upstream(
+    monkeypatch, tmp_path
+) -> None:
+    baseline = {
+        "model-a": {"id": "model-a", "name": "Model A"},
+    }
+    monkeypatch.setenv("AA_MCP_SNAPSHOT_DIR", str(tmp_path))
+
+    from aa_mcp.snapshot import save_snapshot
+
+    save_snapshot(baseline, "llm_models")
+
+    class EmptyClient:
+        def get_llm_models(self):
+            return []
+
+    monkeypatch.setattr(server, "_get_client", lambda: EmptyClient())
+
+    result = json.loads(server.aa_list_recent_updates(save_new_snapshot=True))
+
+    assert result["status"] == "snapshot_preserved"
+    assert result["baseline_model_count"] == 1
