@@ -479,6 +479,22 @@ def aa_list_recent_updates(save_new_snapshot: bool = True) -> str:
 
         old_snapshot = load_latest_snapshot("llm_models")
 
+        if not current_norm and old_snapshot is not None:
+            old_norm = old_snapshot.get("models", old_snapshot)
+            if old_norm:
+                return json.dumps(
+                    {
+                        "status": "snapshot_preserved",
+                        "message": (
+                            "Upstream returned no models; refusing to overwrite "
+                            "the existing baseline snapshot."
+                        ),
+                        "baseline_model_count": len(old_norm),
+                        "hint": "Retry later or check API connectivity.",
+                    },
+                    indent=2,
+                )
+
         if old_snapshot is None:
             # First run: save baseline
             if save_new_snapshot:

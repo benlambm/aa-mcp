@@ -108,10 +108,11 @@ def test_get_retries_transient_http_status_once(monkeypatch) -> None:
 
 def test_post_timeout_is_not_retried(monkeypatch) -> None:
     calls = 0
+    timeouts: list[float] = []
 
     class TimeoutHTTPClient:
         def __init__(self, timeout: float) -> None:
-            pass
+            timeouts.append(timeout)
 
         def __enter__(self):
             return self
@@ -131,6 +132,43 @@ def test_post_timeout_is_not_retried(monkeypatch) -> None:
     with pytest.raises(AAConnectionError):
         client.evaluate_critpt([{"problem_id": "p"}])
     assert calls == 1
+    assert timeouts == [300.0]
+
+
+def test_post_uses_longer_timeout_than_get(monkeypatch) -> None:
+    timeouts: list[float] = []
+
+    class RecordingHTTPClient:
+        def __init__(self, timeout: float) -> None:
+            timeouts.append(timeout)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        def get(self, url: str, headers: dict, params: dict | None):
+            return httpx.Response(
+                200,
+                json={"data": []},
+                request=httpx.Request("GET", url),
+            )
+
+        def post(self, url: str, headers: dict, json: dict):
+            return httpx.Response(
+                200,
+                json={"accuracy": 1.0},
+                request=httpx.Request("POST", url),
+            )
+
+    monkeypatch.setattr(httpx, "Client", RecordingHTTPClient)
+
+    client = AAClient(api_key="test-key", timeout=8, max_retries=0)
+    client.get_llm_models()
+    client.evaluate_critpt([{"problem_id": "p"}])
+
+    assert timeouts == [8.0, 300.0]
 
 
 def test_check_response_raises_structured_request_error() -> None:
