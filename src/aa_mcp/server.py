@@ -35,6 +35,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger("aa_mcp")
 
+# V2 Free data uses a different speed benchmark than the retired /data/ routes,
+# so its snapshots start a new series instead of diffing against legacy ones.
+LLM_SNAPSHOT_NAME = "llm_models_v2"
+
 mcp = FastMCP(
     "Artificial Analysis",
     instructions=(
@@ -76,7 +80,8 @@ def _err_response(tool: str, e: Exception) -> str:
             {
                 "error": "rate_limited",
                 "message": str(e),
-                "hint": "Free API allows 1000 requests/day. Wait and retry.",
+                "hint": "Free tier allows 100 requests per 24-hour window "
+                "(Pro 500). Wait for the reset and retry.",
                 "status_code": e.status_code,
             }
         )
@@ -176,7 +181,9 @@ def aa_list_llms(
         creator: Filter by creator name (case-insensitive substring match)
         name: Filter by model name (case-insensitive substring match)
         slug: Filter by slug (case-insensitive substring match)
-        sort_by: Sort key - 'intelligence', 'price', 'speed', 'ttft', 'coding', 'math'
+        sort_by: Sort key - 'intelligence', 'price', 'speed', 'ttft', 'coding', 'math'.
+            'coding' and 'math' indexes are no longer published, so those sorts
+            have no effect.
         limit: Max models to return (default 20)
 
     Returns:
@@ -477,12 +484,12 @@ def aa_list_recent_updates(save_new_snapshot: bool = True) -> str:
         current_models = client.get_llm_models()
         current_norm = _normalize_models(current_models, "llm")
 
-        old_snapshot = load_latest_snapshot("llm_models")
+        old_snapshot = load_latest_snapshot(LLM_SNAPSHOT_NAME)
 
         if old_snapshot is None:
             # First run: save baseline
             if save_new_snapshot:
-                save_snapshot(current_norm, "llm_models")
+                save_snapshot(current_norm, LLM_SNAPSHOT_NAME)
             return json.dumps(
                 {
                     "status": "baseline_created",
@@ -502,7 +509,7 @@ def aa_list_recent_updates(save_new_snapshot: bool = True) -> str:
         diff = diff_snapshots(old_norm, current_norm)
 
         if save_new_snapshot:
-            save_snapshot(current_norm, "llm_models")
+            save_snapshot(current_norm, LLM_SNAPSHOT_NAME)
 
         readable = format_diff_readable(diff)
 
@@ -544,26 +551,31 @@ def aa_list_media_models(
 
     Args:
         modality: One of 'text-to-image', 'image-editing', 'text-to-speech',
-                  'text-to-video', 'image-to-video'
+                  'text-to-video', 'image-to-video', 'text-to-video-audio',
+                  'image-to-video-audio', 'speech-to-speech', 'speech-to-text',
+                  'music-instrumental', 'music-with-vocals'
         top_n: Number of top models to return (default 10)
-        include_categories: Include per-category Elo breakdown (text-to-image, text-to-video only)
+        include_categories: Per-category Elo breakdown. Pro tier only; the Free
+                  endpoints this server uses do not return it.
 
     Returns:
         JSON array of media model rankings.
     """
     try:
         client = _get_client()
-        models = client.get_media_models(modality, include_categories)
+        models = client.get_media_models(modality)
         top = models[:top_n]
-        return json.dumps(
-            {
-                "modality": modality,
-                "count": len(top),
-                "total_available": len(models),
-                "models": top,
-            },
-            indent=2,
-        )
+        result: dict[str, Any] = {
+            "modality": modality,
+            "count": len(top),
+            "total_available": len(models),
+            "models": top,
+        }
+        if include_categories:
+            result["note"] = (
+                "include_categories needs a Pro API key; Free rankings omit it."
+            )
+        return json.dumps(result, indent=2)
     except Exception as e:
         return _err_response("aa_list_media_models", e)
 
@@ -655,8 +667,7 @@ def aa_healthcheck() -> str:
                 "ok": True,
                 "api_key_preview": masked,
                 "llm_model_count": result["model_count"],
-                "prompt_options": result["prompt_options"],
-                "rate_limit": "1000 requests/day (free tier)",
+                "rate_limit": result["rate_limit"],
             },
             indent=2,
         )

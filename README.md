@@ -27,21 +27,35 @@ uvx aa-mcp
 | `ARTIFICIAL_ANALYSIS_API_KEY` | Yes | - | Your AA API key |
 | `AA_MCP_SNAPSHOT_DIR` | No | `~/.local/share/aa-mcp/snapshots/` | Directory for update snapshots |
 | `AA_MCP_LOG_LEVEL` | No | `INFO` | Log level (DEBUG, INFO, WARNING, ERROR) |
+| `AA_MCP_CACHE_SECONDS` | No | `3600` | How long list results are reused within one server process (`0` disables) |
 
 ## Official API Coverage
 
-This server wraps the current free Artificial Analysis API endpoints documented at
-<https://artificialanalysis.ai/api-reference>:
+This server wraps the Free-tier V2 endpoints documented at
+<https://artificialanalysis.ai/data-api/docs>. They accept Free, Pro, and
+Commercial keys. The legacy `/api/v2/data/*` routes retire on 2026-11-04
+([migration guide](https://artificialanalysis.ai/data-api/migrate-v2-data)).
 
 | Artificial Analysis endpoint | MCP tool |
 |---|---|
-| `GET /api/v2/data/llms/models` | `aa_list_llms`, `aa_get_model`, `aa_compare_models`, `aa_list_recent_updates`, `aa_healthcheck` |
-| `GET /api/v2/data/media/text-to-image` | `aa_list_media_models(modality="text-to-image")` |
-| `GET /api/v2/data/media/image-editing` | `aa_list_media_models(modality="image-editing")` |
-| `GET /api/v2/data/media/text-to-speech` | `aa_list_media_models(modality="text-to-speech")` |
-| `GET /api/v2/data/media/text-to-video` | `aa_list_media_models(modality="text-to-video")` |
-| `GET /api/v2/data/media/image-to-video` | `aa_list_media_models(modality="image-to-video")` |
+| `GET /api/v2/language/models/free` | `aa_list_llms`, `aa_get_model`, `aa_compare_models`, `aa_list_recent_updates`, `aa_healthcheck` |
+| `GET /api/v2/media/text-to-image/models/free` | `aa_list_media_models(modality="text-to-image")` |
+| `GET /api/v2/media/image-editing/models/free` | `aa_list_media_models(modality="image-editing")` |
+| `GET /api/v2/media/text-to-speech/models/free` | `aa_list_media_models(modality="text-to-speech")` |
+| `GET /api/v2/media/text-to-video/models/free` | `aa_list_media_models(modality="text-to-video")` |
+| `GET /api/v2/media/image-to-video/models/free` | `aa_list_media_models(modality="image-to-video")` |
+| `GET /api/v2/media/text-to-video-audio/models/free` | `aa_list_media_models(modality="text-to-video-audio")` |
+| `GET /api/v2/media/image-to-video-audio/models/free` | `aa_list_media_models(modality="image-to-video-audio")` |
+| `GET /api/v2/media/speech-to-speech/models/free` | `aa_list_media_models(modality="speech-to-speech")` |
+| `GET /api/v2/media/speech-to-text/models/free` | `aa_list_media_models(modality="speech-to-text")` |
+| `GET /api/v2/media/music/instrumental/models/free` | `aa_list_media_models(modality="music-instrumental")` |
+| `GET /api/v2/media/music/with-vocals/models/free` | `aa_list_media_models(modality="music-with-vocals")` |
 | `POST /api/v2/critpt/evaluate` | `aa_evaluate_critpt` |
+
+To keep tool output stable, the client maps V2 records back onto the legacy field
+names: `performance.*` speeds are copied to top-level `median_*` fields, media
+lists get `rank` from leaderboard order, and `price_1m_blended_3_to_1` is derived
+as `(3 × input + output) / 4` because the Free tier no longer returns it.
 
 ## MCP Tools
 
@@ -77,9 +91,10 @@ Detect changes since the last local snapshot.
 ### `aa_list_media_models`
 Query multimodal / media model rankings.
 
-- **Modalities**: `text-to-image`, `image-editing`, `text-to-speech`, `text-to-video`, `image-to-video`
+- **Modalities**: `text-to-image`, `image-editing`, `text-to-speech`, `text-to-video`, `image-to-video`, `text-to-video-audio`, `image-to-video-audio`, `speech-to-speech`, `speech-to-text`, `music-instrumental`, `music-with-vocals`
 - **`top_n`**: Limit results (default 10)
-- **`include_categories`**: Per-category Elo breakdown where the upstream endpoint supports it
+- **`include_categories`**: Pro tier only; Free rankings omit it and the response carries a `note`
+- Speech-to-speech and speech-to-text are scored by benchmark (no Elo), so they have no `rank`
 
 ### `aa_evaluate_critpt`
 Submit a complete CritPt benchmark batch to the official evaluation endpoint.
@@ -92,7 +107,7 @@ Submit a complete CritPt benchmark batch to the official evaluation endpoint.
 ### `aa_healthcheck`
 Verify API key and upstream connectivity.
 
-- Returns masked key preview, model count, rate limit info
+- Returns masked key preview, model count, and the live tier and quota from the `X-AA-Tier` and `X-RateLimit-*` headers
 - Reports specific error types (auth, rate limit, server error)
 
 ## Snapshot / Update Tracking
@@ -177,11 +192,12 @@ uv run twine check dist/*
 
 ## Known Limitations
 
-- **Free API tier**: 1000 requests/day rate limit
+- **Rate limit**: Free 100 / Pro 500 requests per fixed 24-hour window. The LLM list spans several pages (about 4 requests), so results are cached per process
+- **Free fields only**: individual benchmarks (MMLU-Pro, GPQA, HLE, and so on), the Math Index, and media `appearances`/`release_date` are Pro-only. The Coding Index is always null upstream
 - **No explicit "updated_at" field**: Update detection relies on snapshot diffs, not API metadata
 - **LLM data only for snapshots**: Media model snapshot tracking is not yet implemented
 - **CritPt completeness**: The upstream evaluation API requires submissions for the full public problem set; this server validates object shape but cannot verify set completeness locally
-- **No pagination**: The free API returns all models in a single response; no cursor/offset support
+- **Snapshot series**: V2 snapshots are saved as `llm_models_v2_*` because V2 speed figures use a different benchmark prompt than the legacy routes; legacy `llm_models_*` files are not diffed
 - **Snapshot storage**: Local filesystem only; no cloud sync
 
 ## Attribution

@@ -9,7 +9,7 @@ This is a Python MCP server package using a `src` layout. Core code lives in `sr
 - `snapshot.py`: local snapshot persistence, normalization, and diff formatting.
 - `__init__.py`: package metadata surface.
 
-Project metadata and packaging configuration are in `pyproject.toml`; dependency locking is in `uv.lock`. There is currently no committed `tests/` directory, so add one when introducing automated coverage.
+Project metadata and packaging configuration are in `pyproject.toml`; dependency locking is in `uv.lock`. Tests live in `tests/`; `tests/conftest.py` clears the client's list cache between tests.
 
 ## Build, Test, and Development Commands
 
@@ -18,7 +18,7 @@ Use `uv` for all Python workflows.
 - `uv sync`: install locked dependencies for local development.
 - `uvx aa-mcp`: run the published MCP server using stdio transport.
 - `uv build`: build source and wheel distributions.
-- `uv run pytest`: run the test suite once tests are added.
+- `uv run pytest`: run the test suite.
 
 For manual server checks, set `ARTIFICIAL_ANALYSIS_API_KEY` before launching:
 
@@ -46,6 +46,11 @@ uv run pytest
 Recent commits use Conventional Commit prefixes such as `feat:`, `fix:`, and `refactor:`. Keep subjects imperative and scoped, for example `fix: handle AA rate limit responses`.
 
 Pull requests should include a short summary, test results, and any environment or API-key assumptions. Link related issues when available. For behavior changes, include example MCP tool inputs and representative output.
+
+## API Notes
+
+- 2026-10-29: migrated off the legacy `/api/v2/data/*` routes (retired 2026-11-04) to the Free V2 `/free` endpoints. Ben's key is Free tier (100 requests/day); Pro routes return 403.
+- `~/.local/bin/aa-update-check` (LaunchAgent `com.benlamb.aa-update-check`, 6am and 6pm) drives `aa_list_recent_updates` and reads the `llm_models_v2_*` snapshots directly. Rename the snapshot series in both places or neither.
 
 ## Security & Configuration Tips
 

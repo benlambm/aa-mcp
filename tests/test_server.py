@@ -151,3 +151,18 @@ def test_aa_list_llms_preserves_success_shape(monkeypatch) -> None:
             "release_date": None,
         }
     ]
+
+
+def test_aa_list_media_models_notes_pro_only_categories(monkeypatch) -> None:
+    class FakeMediaClient:
+        def get_media_models(self, modality):
+            return [{"id": "a", "elo": 1200, "rank": 1}]
+
+    monkeypatch.setattr(server, "_get_client", lambda: FakeMediaClient())
+
+    result = json.loads(
+        server.aa_list_media_models("text-to-image", top_n=5, include_categories=True)
+    )
+
+    assert result["models"] == [{"id": "a", "elo": 1200, "rank": 1}]
+    assert "Pro" in result["note"]

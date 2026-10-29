@@ -28,6 +28,12 @@ LLM_EVAL_FIELDS = {
     "livecodebench",
     "math_500",
     "aime",
+    "artificial_analysis_finance_and_accounting_index",
+    "artificial_analysis_strategy_and_ops_index",
+    "artificial_analysis_legal_index",
+    "artificial_analysis_healthcare_and_medical_index",
+    "artificial_analysis_engineering_index",
+    "artificial_analysis_economics_index",
 }
 
 # Pricing sub-fields to track
